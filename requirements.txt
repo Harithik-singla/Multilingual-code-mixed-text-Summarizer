@@ -1,0 +1,11 @@
+transformers
+torch
+datasets
+sentencepiece
+rouge-score
+bert-score
+fastapi
+uvicorn
+indic-transliteration
+pyyaml
+python-dotenv

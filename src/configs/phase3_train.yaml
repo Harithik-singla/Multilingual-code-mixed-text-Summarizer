@@ -1,0 +1,8 @@
+# Phase 3: Stabilization training with ILSUM mix
+ilsum_mix_ratio: 0.2
+load_from: artifacts/checkpoints/phase2
+epochs: 3
+learning_rate: 1.5e-5
+batch_size: 2
+gradient_accumulation_steps: 8
+mixed_precision: true

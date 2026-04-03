@@ -1,0 +1,14 @@
+# Model name
+model_name: ai4bharat/IndicBART
+
+# Maximum input length for tokenization
+max_input_length: 512
+
+# Maximum output length for generation
+max_output_length: 128
+
+# Supported language tags
+language_tags:
+  - <2hi>
+  - <2ta>
+  - <2en>
