@@ -184,4 +184,4 @@ if __name__ == "__main__":
 
     print(f"Different ITRANS variants:")
     print(f"  IAST: {trans.to_devanagari(text_iast)}")
-    print(f"  SLP1: {trans.to_dev
+    print(f"  SLP1: {trans.to_devanagari(text_slp1)}")
