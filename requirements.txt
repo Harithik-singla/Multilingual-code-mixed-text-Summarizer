@@ -2,6 +2,8 @@ transformers
 torch
 datasets
 sentencepiece
+scikit-learn
+pandas
 rouge-score
 bert-score
 fastapi
@@ -9,3 +11,4 @@ uvicorn
 indic-transliteration
 pyyaml
 python-dotenv
+-e .

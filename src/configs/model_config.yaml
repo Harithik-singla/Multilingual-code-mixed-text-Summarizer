@@ -7,8 +7,11 @@ max_input_length: 512
 # Maximum output length for generation
 max_output_length: 128
 
-# Supported language tags
+# Supported language tags (IndicBART official format)
+# Hindi=<2hi>, Bengali=<2bn>, Gujarati=<2gu>, English=<2en>
+# Hinglish also uses <2hi> (Hindi is dominant)
 language_tags:
   - <2hi>
-  - <2ta>
+  - <2bn>
+  - <2gu>
   - <2en>
