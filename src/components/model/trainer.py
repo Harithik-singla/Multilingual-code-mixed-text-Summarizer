@@ -156,7 +156,7 @@ class ModelTrainer:
                 args=training_args,
                 train_dataset=train_dataset,
                 eval_dataset=eval_dataset,
-                tokenizer=self.tokenizer,
+                processing_class=self.tokenizer,
                 data_collator=data_collator,
                 compute_metrics=self.compute_rouge,
             )

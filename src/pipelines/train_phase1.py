@@ -27,7 +27,7 @@ LANGUAGES         = ["Hindi", "Bengali", "English", "Gujarati"]
 
 # Set to a small number (e.g. 200) for a quick test run
 # Set to None to use ALL data for full training
-MAX_SAMPLES_PER_LANGUAGE = None
+MAX_SAMPLES_PER_LANGUAGE = 200  # change to None for full training
 # ──────────────────────────────────────────────────────────────────────
 
 

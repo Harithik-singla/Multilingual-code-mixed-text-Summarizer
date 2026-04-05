@@ -55,13 +55,12 @@ class TokenizerUtils:
             )
 
             # Tokenize summary (target output)
-            with self.tokenizer.as_target_tokenizer():
-                targets = self.tokenizer(
-                    batch["summary"],
-                    max_length=self.max_output_length,
-                    padding="max_length",
-                    truncation=True,
-                )
+            targets = self.tokenizer(
+                batch["summary"],
+                max_length=self.max_output_length,
+                padding="max_length",
+                truncation=True,
+            )
 
             # Replace pad token ids in labels with -100
             # This tells the model: "don't calculate loss on padding positions"
