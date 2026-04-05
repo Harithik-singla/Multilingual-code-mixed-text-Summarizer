@@ -17,40 +17,21 @@ from src.logging.logger import logging
 class DatasetLoader:
     """Load and preprocess ILSUM and HinGE code-mixed datasets."""
 
-    # ------------------------------------------------------------------ #
-    #  ILSUM-2.0 — monolingual summarization (Phase 1 training base)      #
-    #  Each language is saved separately for per-language training        #
-    #                                                                      #
-    #  Available languages and their row counts:                           #
-    #    Hindi     → 24.2k rows                                           #
-    #    Bengali   → 15.3k rows                                           #
-    #    English   → 31.2k rows                                           #
-    #    Gujarati  → 36.6k rows                                           #
-    # ------------------------------------------------------------------ #
     ILSUM_DATASET_ID = "ILSUM/ILSUM-2.0"
     ILSUM_LANGUAGES  = ["Hindi", "Bengali", "English", "Gujarati"]
-
     ILSUM_COLUMN_MAP = {
         "Article": "text",
         "Summary": "summary",
-        "Heading": "heading",   # dropped after rename
+        "Heading": "heading",  # renamed then dropped
     }
 
-    # ------------------------------------------------------------------ #
-    #  HinGE — Hindi↔Hinglish dataset (Phase 2 code-mixed)               #
-    #  ID    : LingoIITGN/HinGE                                           #
-    #  Split : train only (1.98k rows)                                    #
-    #                                                                      #
-    #  Columns used:                                                       #
-    #    Hindi                    → text    (monolingual source)          #
-    #    Human-generated Hinglish → summary (code-mixed target)           #
-    # ------------------------------------------------------------------ #
+   
     HINGE_DATASET_ID = "LingoIITGN/HinGE"
     HINGE_COLUMN_MAP = {
-        "Hindi":                    "text",
-        "Human-generated Hinglish": "summary",
+        "Human-generated Hinglish": "text",    # code-mixed input
+        "English":                  "summary", # clean English output
     }
-    HINGE_KEEP_COLS  = ["text", "summary"]
+    HINGE_KEEP_COLS = ["text", "summary", "language"]
 
     def __init__(self, data_dir: str = "artifacts/data"):
         try:
@@ -71,8 +52,8 @@ class DatasetLoader:
     def load_ilsum_language(self, lang: str) -> pd.DataFrame:
         """
         Load one ILSUM-2.0 language config from HuggingFace.
-        Pools its train + test splits into a single DataFrame
-        (we re-split ourselves via split_data).
+        Pools its train + test splits into one DataFrame.
+        We re-split into train/val/test ourselves via split_data().
 
         Args:
             lang: One of 'Hindi', 'Bengali', 'English', 'Gujarati'
@@ -94,11 +75,14 @@ class DatasetLoader:
             all_splits = []
             for split_name, split_data in dataset.items():
                 df = split_data.to_pandas()
-                logging.info(f"  [{lang}/{split_name}] "
-                             f"cols: {list(df.columns)}, rows: {len(df)}")
+                logging.info(
+                    f"  [{lang}/{split_name}] "
+                    f"raw cols: {list(df.columns)}, rows: {len(df)}"
+                )
 
                 df = df.rename(columns=self.ILSUM_COLUMN_MAP)
 
+                # Validate required columns exist after rename
                 for required in ["text", "summary"]:
                     if required not in df.columns:
                         raise ValueError(
@@ -114,6 +98,7 @@ class DatasetLoader:
 
             lang_df = pd.concat(all_splits, ignore_index=True)
 
+            # Drop null rows
             before  = len(lang_df)
             lang_df = lang_df.dropna(subset=["text", "summary"]).reset_index(drop=True)
             dropped = before - len(lang_df)
@@ -128,7 +113,9 @@ class DatasetLoader:
 
     def load_all_ilsum_languages(self) -> Dict[str, pd.DataFrame]:
         """
-        Load all ILSUM-2.0 language configs individually.
+        Load all 4 ILSUM-2.0 language configs individually.
+        Each language stays as a separate DataFrame for
+        per-language Phase 1 training.
 
         Returns:
             Dict mapping language name → DataFrame
@@ -137,10 +124,10 @@ class DatasetLoader:
         try:
             logging.info(f"Loading all ILSUM languages: {self.ILSUM_LANGUAGES}")
             language_dfs = {}
+
             for lang in self.ILSUM_LANGUAGES:
                 language_dfs[lang] = self.load_ilsum_language(lang)
 
-            # Log summary
             logging.info("ILSUM load summary:")
             for lang, df in language_dfs.items():
                 logging.info(f"  {lang}: {len(df)} rows")
@@ -157,12 +144,19 @@ class DatasetLoader:
         """
         Load HinGE (LingoIITGN/HinGE) from HuggingFace.
 
-        Raw columns used:
-            Hindi                    → text    (monolingual Hindi source)
-            Human-generated Hinglish → summary (code-mixed Hinglish target)
+        Mapping rationale:
+            Human-generated Hinglish → text
+                Code-mixed sentences the model must learn to READ.
+                This is the noisy real-world input users write.
 
-        All other columns (English, WAC, WAC rating1/2, PAC, PAC rating1/2)
-        are dropped.
+            English → summary
+                Clean English equivalent the model must PRODUCE.
+                Matches Phase 1 output style (clean, monolingual).
+
+        This direction (Hinglish → English) teaches the model to:
+            1. Understand code-mixed Hinglish input
+            2. Still produce clean English output
+        ...which is exactly the Phase 2 code-mixed adaptation goal.
 
         Returns:
             DataFrame with columns: 'text', 'summary', 'language'
@@ -174,9 +168,12 @@ class DatasetLoader:
             split_key = "train" if "train" in dataset else list(dataset.keys())[0]
             df        = dataset[split_key].to_pandas()
 
-            logging.info(f"  [HinGE/{split_key}] "
-                         f"raw cols: {list(df.columns)}, rows: {len(df)}")
+            logging.info(
+                f"  [HinGE/{split_key}] "
+                f"raw cols: {list(df.columns)}, rows: {len(df)}"
+            )
 
+            # Validate expected raw columns exist before rename
             for raw_col in self.HINGE_COLUMN_MAP:
                 if raw_col not in df.columns:
                     raise ValueError(
@@ -185,16 +182,24 @@ class DatasetLoader:
                     )
 
             df = df.rename(columns=self.HINGE_COLUMN_MAP)
-            df = df[self.HINGE_KEEP_COLS].copy()
-            df["language"] = "Hinglish"
 
+            # Add language tag then keep only needed columns
+            df["language"] = "Hinglish"
+            df = df[self.HINGE_KEEP_COLS].copy()
+
+            # Drop null rows
             before  = len(df)
             df      = df.dropna(subset=["text", "summary"]).reset_index(drop=True)
             dropped = before - len(df)
             if dropped:
                 logging.warning(f"  [HinGE] Dropped {dropped} null rows")
 
-            logging.info(f"HinGE ready — {len(df)} rows, cols: {list(df.columns)}")
+            # Log a sample so we can visually confirm mapping is correct
+            logging.info(
+                f"HinGE ready — {len(df)} rows\n"
+                f"  Sample text    (Hinglish): {df['text'].iloc[0][:80]}...\n"
+                f"  Sample summary (English) : {df['summary'].iloc[0][:80]}..."
+            )
             return df
 
         except Exception as e:
@@ -210,13 +215,26 @@ class DatasetLoader:
         val_ratio: float   = 0.15,
         test_ratio: float  = 0.15,
     ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        """Split a DataFrame into train / val / test sets."""
+        """
+        Split a DataFrame into train / val / test sets.
+
+        Args:
+            dataframe   : Input DataFrame to split
+            train_ratio : Fraction for training   (default 0.70)
+            val_ratio   : Fraction for validation (default 0.15)
+            test_ratio  : Fraction for testing    (default 0.15)
+
+        Returns:
+            Tuple of (train_df, val_df, test_df)
+        """
         try:
             assert round(train_ratio + val_ratio + test_ratio, 5) == 1.0, \
-                "Ratios must sum to 1.0"
+                "train_ratio + val_ratio + test_ratio must equal 1.0"
 
-            logging.info(f"Splitting {len(dataframe)} rows — "
-                         f"train:{train_ratio} val:{val_ratio} test:{test_ratio}")
+            logging.info(
+                f"Splitting {len(dataframe)} rows — "
+                f"train:{train_ratio} val:{val_ratio} test:{test_ratio}"
+            )
 
             train_df, temp_df = train_test_split(
                 dataframe,
@@ -229,7 +247,10 @@ class DatasetLoader:
                 random_state=42
             )
 
-            logging.info(f"Split — Train:{len(train_df)} Val:{len(val_df)} Test:{len(test_df)}")
+            logging.info(
+                f"Split done — "
+                f"Train: {len(train_df)} | Val: {len(val_df)} | Test: {len(test_df)}"
+            )
             return train_df, val_df, test_df
 
         except Exception as e:
@@ -245,7 +266,19 @@ class DatasetLoader:
         test_df: pd.DataFrame,
         save_dir: str,
     ) -> Dict[str, str]:
-        """Save train/val/test DataFrames as CSVs to save_dir."""
+        """
+        Save train/val/test DataFrames as CSVs to save_dir.
+
+        Args:
+            train_df : Training DataFrame
+            val_df   : Validation DataFrame
+            test_df  : Test DataFrame
+            save_dir : Directory to save CSVs into
+
+        Returns:
+            Dict mapping split name → csv file path
+            e.g. { 'train': '.../train.csv', 'val': '...', 'test': '...' }
+        """
         try:
             os.makedirs(save_dir, exist_ok=True)
             paths = {}
@@ -263,7 +296,7 @@ class DatasetLoader:
     #  Main pipeline                                                       #
     # ------------------------------------------------------------------ #
     def initiate_data_loading(self) -> Dict[str, Dict[str, str]]:
-    
+       
         try:
             logging.info("=" * 50)
             logging.info("Starting data loading pipeline...")
@@ -271,21 +304,20 @@ class DatasetLoader:
 
             artifact = {"ilsum": {}, "hinge": {}}
 
-            # --- ILSUM: save each language into its own subfolder ---
-            logging.info("Step 1/2: Loading ILSUM dataset (per language)...")
+            # --- Step 1: ILSUM — one subfolder per language ---
+            logging.info("Step 1/2: Loading ILSUM (per language)...")
             language_dfs = self.load_all_ilsum_languages()
 
             for lang, lang_df in language_dfs.items():
-                # e.g. artifacts/data/ilsum_processed/Hindi/
                 lang_save_dir = os.path.join(self.ilsum_dir, lang)
-                logging.info(f"Splitting and saving ILSUM [{lang}]...")
+                logging.info(f"  Splitting and saving ILSUM [{lang}]...")
                 artifact["ilsum"][lang] = self.save_splits(
                     *self.split_data(lang_df),
                     save_dir=lang_save_dir
                 )
 
-            # --- HinGE: single folder for code-mixed ---
-            logging.info("Step 2/2: Loading HinGE dataset...")
+            # --- Step 2: HinGE — single folder for code-mixed ---
+            logging.info("Step 2/2: Loading HinGE (Hinglish → English)...")
             hinge_df = self.load_hinge_dataset()
             artifact["hinge"] = self.save_splits(
                 *self.split_data(hinge_df),
@@ -322,7 +354,7 @@ if __name__ == "__main__":
             for split, path in paths.items():
                 print(f"    {split}: {path}")
 
-        print("\nHinGE (code-mixed):")
+        print("\nHinGE (Hinglish → English):")
         for split, path in artifacts["hinge"].items():
             print(f"  {split}: {path}")
 
