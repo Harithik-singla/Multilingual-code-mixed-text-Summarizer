@@ -2,7 +2,7 @@
 model_name: ai4bharat/IndicBART
 
 # Maximum input length for tokenization
-max_input_length: 512
+max_input_length: 300
 
 # Maximum output length for generation
 max_output_length: 128

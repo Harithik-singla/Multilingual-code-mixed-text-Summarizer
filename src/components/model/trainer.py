@@ -107,13 +107,15 @@ class ModelTrainer:
             grad_accum  = self.config.get("gradient_accumulation_steps", 8)
             mixed_prec  = self.config.get("mixed_precision", False)
 
-            # Only use fp16 (mixed precision) if we actually have a CUDA GPU
-            use_fp16 = mixed_prec and torch.cuda.is_available()
+            # Prefer bf16 over fp16 — bf16 has same exponent range as fp32
+            # so it avoids NaN overflow. RTX 3050 Ti (Ampere) supports bf16.
+            use_bf16 = mixed_prec and torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+            use_fp16 = mixed_prec and torch.cuda.is_available() and not use_bf16
 
             logging.info(
                 f"Starting Phase {self.phase} training — "
                 f"epochs={epochs}, lr={lr}, batch={batch_size}, "
-                f"grad_accum={grad_accum}, fp16={use_fp16}"
+                f"grad_accum={grad_accum}, bf16={use_bf16}, fp16={use_fp16}"
             )
 
             training_args = Seq2SeqTrainingArguments(
@@ -126,13 +128,16 @@ class ModelTrainer:
                 gradient_accumulation_steps=grad_accum,
 
                 fp16=use_fp16,
+                bf16=use_bf16,
 
                 eval_strategy="epoch",
                 save_strategy="epoch",
                 load_best_model_at_end=True,
-                save_total_limit=2,           # keep only 2 best checkpoints
+                save_total_limit=2,
 
-                predict_with_generate=True,   # needed for ROUGE evaluation
+                # Phase 1: skip slow beam-search generation during eval
+                # Phase 2/3: enable for ROUGE scoring
+                predict_with_generate=(self.phase > 1),
                 generation_max_length=128,
 
                 logging_steps=50,
