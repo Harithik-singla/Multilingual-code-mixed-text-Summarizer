@@ -103,4 +103,9 @@ Thumbs.db
 
 artifacts/model_cache/
 torch-2.6.0+cu124-cp313-cp313-win_amd64.whl
-artifacts/
+artifacts/results/
+artifacts/checkpoints/
+artifacts/data/ilsum_processed/
+artifacts/data/synthetic_codemixed/
+artifacts/data/preprocessed/
+artifacts/data/real_codemixed/

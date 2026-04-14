@@ -1,5 +1,6 @@
 """
-End-to-end inference: detects language, tokenizes input, generates summary.
+End-to-end inference: detects language, transliterates if needed,
+tokenizes input, generates summary.
 Loads the best available checkpoint (phase3 → phase2 → phase1 fallback).
 """
 
@@ -10,6 +11,7 @@ import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
 from src.components.inference.language_detector import detect_language_tag
+from src.components.data.transliterator import transliterate_to_native
 from src.exception.exception import CodeMixedSummarizationException
 from src.logging.logger import logging
 
@@ -49,7 +51,11 @@ class Predictor:
 
     def predict(self, text):
         try:
-            lang_tag   = detect_language_tag(text)
+            lang_tag = detect_language_tag(text)
+
+            # Transliterate Romanized Bengali/Gujarati to native script
+            text = transliterate_to_native(text, lang_tag)
+
             tagged_text = f"{lang_tag} {text.strip()}"
 
             inputs = self.tokenizer(

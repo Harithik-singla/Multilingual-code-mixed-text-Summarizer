@@ -6,8 +6,7 @@ scikit-learn
 pandas
 rouge-score
 bert-score
-fastapi
-uvicorn
+streamlit
 indic-transliteration
 pyyaml
 python-dotenv
