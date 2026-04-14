@@ -55,13 +55,15 @@ def load_split(split):
             real_df = real_df.head(MAX_SAMPLES_REAL)
         logging.info(f"Real HinGE [{split}]: {len(real_df)} rows")
 
-    # Mix at 70/30 ratio by sampling
-    n_synthetic = int(len(synthetic_df) * 0.7)
-    n_real      = int(len(real_df) * 0.3)
-    synthetic_sample = synthetic_df.sample(n=min(n_synthetic, len(synthetic_df)), random_state=42)
-    real_sample      = real_df.sample(n=min(n_real, len(real_df)), random_state=42)
+    # Mix: use all real data, then sample synthetic to make it 70/30 overall
+    if len(real_df) == 0 or len(synthetic_df) == 0:
+        combined = pd.concat([synthetic_df, real_df], ignore_index=True)
+    else:
+        # n_real = 30% → n_synthetic should be (70/30) * n_real = 2.33 * n_real
+        n_synthetic = min(int(len(real_df) * 7 / 3), len(synthetic_df))
+        synthetic_sample = synthetic_df.sample(n=n_synthetic, random_state=42)
+        combined = pd.concat([synthetic_sample, real_df], ignore_index=True)
 
-    combined = pd.concat([synthetic_sample, real_sample], ignore_index=True)
     combined = combined.sample(frac=1, random_state=42).reset_index(drop=True)
     logging.info(f"Combined [{split}]: {len(combined)} rows")
     return combined
