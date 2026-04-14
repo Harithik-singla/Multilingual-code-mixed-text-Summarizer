@@ -1,4 +1,3 @@
-# Phase 2: Code-mixed training on synthetic + real data
 synthetic_ratio: 0.7
 real_ratio: 0.3
 load_from: artifacts/checkpoints/phase1
@@ -7,3 +6,5 @@ learning_rate: 3.0e-5
 batch_size: 16
 gradient_accumulation_steps: 1
 mixed_precision: true
+eval_strategy: "no"
+save_strategy: "epoch"

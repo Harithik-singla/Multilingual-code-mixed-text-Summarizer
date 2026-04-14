@@ -130,9 +130,9 @@ class ModelTrainer:
                 fp16=use_fp16,
                 bf16=use_bf16,
 
-                eval_strategy="epoch",
-                save_strategy="epoch",
-                load_best_model_at_end=True,
+                eval_strategy=self.config.get("eval_strategy", "epoch"),
+                save_strategy=self.config.get("save_strategy", "epoch"),
+                load_best_model_at_end=False,
                 save_total_limit=2,
 
                 # Phase 1: skip slow beam-search generation during eval
@@ -141,6 +141,7 @@ class ModelTrainer:
                 generation_max_length=128,
 
                 logging_steps=50,
+                eval_accumulation_steps=self.config.get("eval_accumulation_steps", 4),
                 warmup_steps=100,
                 weight_decay=0.01,
 
