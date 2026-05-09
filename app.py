@@ -8,7 +8,7 @@ from src.components.inference.predictor import Predictor
 
 st.set_page_config(
     page_title="Code-Mixed Text Summarizer",
-    page_icon="🌐",
+    page_icon="",
     layout="centered"
 )
 
